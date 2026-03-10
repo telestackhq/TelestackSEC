@@ -1,0 +1,35 @@
+# Dev & test files
+tests/
+examples/
+*.test.ts
+
+# Local db files
+prisma/alice.db
+prisma/bob.db
+prisma/demo.db
+
+# Build artifacts / maps (optionally keep .js.map for debugging)
+dist/**/*.js.map
+dist/**/*.d.ts.map
+
+# Misc
+.env
+.env.example
+out.txt
+tsc-errors.txt
+node_modules/
+docker-compose.yml
+jest.config.js
+tsconfig.test.json
+
+# Internal docs (keep README, SECURITY, CONTRIBUTING)
+ACHIEVEMENTS.md
+ALICE_BOB_TEST.md
+BUILD_COMPLETE.md
+BUILD_VERIFICATION.md
+ISSUE_RESOLUTION_SUMMARY.md
+ONE_PAGE_SUMMARY.md
+QUICK_SUMMARY.md
+REPEAT_ISSUE_ANALYSIS.md
+SECURITY_AUDIT_REPORT.md
+VISUAL_SUMMARY.md
