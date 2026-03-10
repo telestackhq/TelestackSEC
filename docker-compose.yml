@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  postgres:
+    container_name: telestack-storage-db-v1
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: telestack_storage
+      POSTGRES_USER: telestack
+      POSTGRES_PASSWORD: telestack
+    ports:
+      - "5433:5432" # Using 5433 to avoid conflict with Auth DB if running
+    volumes:
+      - postgres_storage_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telestack -d telestack_storage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_storage_data:

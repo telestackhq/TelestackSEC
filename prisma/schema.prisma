@@ -1,0 +1,343 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Users table
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  identityKey IdentityKey?
+  signedPreKeys SignedPreKey[]
+  prekeys     PreKey[]
+  sessionsA   Session[]   @relation("user_a")
+  sessionsB   Session[]   @relation("user_b")
+  msgFrom     Message[]   @relation("from_user")
+  msgTo       Message[]   @relation("to_user")
+  devices     Device[]
+  relayOut    DeviceEnvelope[] @relation("relay_from_user")
+  relayIn     DeviceEnvelope[] @relation("relay_to_user")
+  groupMemberships GroupMember[]
+  senderKeys      SenderKey[]
+  senderKeysSent  SenderKeyDistribution[] @relation("sender")
+  senderKeysReceived SenderKeyDistribution[] @relation("recipient")
+  groupMessages   GroupMessage[]
+  createdGroups   Group[]
+  callsMade       Call[] @relation("caller")
+  callsReceived   Call[] @relation("callee")
+  iceExchange     CallIceCandidate[]
+
+  @@map("users")
+}
+
+// Registered user devices for client-side trust mode.
+model Device {
+  id                String   @id @default(uuid())
+  userId            String
+  name              String
+  identityPublicKey String
+  registrationId    Int
+  isPrimary         Boolean  @default(false)
+  lastSeenAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prekeys       DevicePreKey[]
+  signedPreKeys DeviceSignedPreKey[]
+  relayOut      DeviceEnvelope[]   @relation("relay_from_device")
+  relayIn       DeviceEnvelope[]   @relation("relay_to_device")
+
+  @@unique([userId, registrationId])
+  @@index([userId, createdAt])
+  @@map("devices")
+}
+
+model DevicePreKey {
+  id        String   @id @default(uuid())
+  deviceId  String
+  keyId     Int
+  publicKey String
+  used      Boolean  @default(false)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, keyId])
+  @@index([deviceId, used])
+  @@map("device_prekeys")
+}
+
+model DeviceSignedPreKey {
+  id        String   @id @default(uuid())
+  deviceId  String
+  keyId     Int
+  publicKey String
+  signature String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, keyId])
+  @@index([deviceId, active])
+  @@map("device_signed_prekeys")
+}
+
+// Server-relayed encrypted envelopes for device-to-device delivery.
+model DeviceEnvelope {
+  id                String   @id @default(uuid())
+  senderUserId      String
+  senderDeviceId    String
+  recipientUserId   String
+  recipientDeviceId String
+  ciphertext        String
+  envelopeType      String
+  deliveredAt       DateTime?
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  senderUser      User   @relation("relay_from_user", fields: [senderUserId], references: [id], onDelete: Cascade)
+  senderDevice    Device @relation("relay_from_device", fields: [senderDeviceId], references: [id], onDelete: Cascade)
+  recipientUser   User   @relation("relay_to_user", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  recipientDevice Device @relation("relay_to_device", fields: [recipientDeviceId], references: [id], onDelete: Cascade)
+
+  @@index([recipientDeviceId, deliveredAt, expiresAt, createdAt])
+  @@index([expiresAt])
+  @@map("device_envelopes")
+}
+
+// Identity Keys (encrypted private key stored)
+model IdentityKey {
+  userId                String   @id
+  publicKey             String   // Base64 encoded
+  encryptedPrivateKey   String   // Encrypted with master key
+  createdAt             DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("identity_keys")
+}
+
+// Signed PreKey (long-term prekey signed by identity key for X3DH authentication)
+model SignedPreKey {
+  id                  Int      @id @default(autoincrement())
+  userId              String
+  publicKey           String   // Base64 encoded
+  encryptedPrivateKey String   // Encrypted with master key
+  signature           String   // Signature from identity key (Base64)
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  rotatedAt           DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId, active])
+  @@index([userId, createdAt])
+  @@map("signed_prekeys")
+}
+
+// PreKeys (one-time keys for session initiation)
+model PreKey {
+  id                  Int      @id @default(autoincrement())
+  userId              String
+  publicKey           String   // Base64 encoded
+  encryptedPrivateKey String   // Encrypted with master key
+  used                Boolean  @default(false)
+  usedAt              DateTime?
+  createdAt           DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, used])
+  @@index([userId, createdAt])
+  @@map("prekeys")
+}
+
+// Sessions (established between two users)
+model Session {
+  id                String   @id @default(uuid())
+  userAId           String
+  userBId           String
+  encryptedState    String   // Double Ratchet state (encrypted)
+  lastMessageAt     DateTime @default(now()) @updatedAt
+  createdAt         DateTime @default(now())
+
+  userA User @relation("user_a", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("user_b", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+  @@index([lastMessageAt])
+  @@map("sessions")
+}
+
+// Message history (optional audit/replay prevention)
+model Message {
+  id            String   @id @default(uuid())
+  fromUserId    String
+  toUserId      String
+  ciphertext    String   // Base64 encoded encrypted message
+  createdAt     DateTime @default(now())
+
+  fromUser User @relation("from_user", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("to_user", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([fromUserId, createdAt])
+  @@index([toUserId, createdAt])
+  @@map("messages")
+}
+
+// Processed ciphertext hashes for replay attack detection.
+model ProcessedMessage {
+  id             String   @id @default(uuid())
+  sessionId      String
+  recipientUserId String
+  ciphertextHash String
+  createdAt      DateTime @default(now())
+
+  @@unique([sessionId, recipientUserId, ciphertextHash])
+  @@index([recipientUserId, createdAt])
+  @@map("processed_messages")
+}
+
+// Groups for group messaging
+model Group {
+  id        String   @id @default(uuid())
+  name      String
+  creatorId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creator             User                    @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  members             GroupMember[]
+  messages            GroupMessage[]
+  senderKeys          SenderKey[]
+  senderKeyDistributions SenderKeyDistribution[]
+  calls               Call[]
+
+  @@index([creatorId])
+  @@map("groups")
+}
+
+// Group members
+model GroupMember {
+  id        String   @id @default(uuid())
+  groupId   String
+  userId    String
+  isAdmin   Boolean  @default(false)
+  joinedAt  DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("group_members")
+}
+
+// Sender keys for group messaging (one per sender per group)
+model SenderKey {
+  id             String   @id @default(uuid())
+  groupId        String
+  senderId       String
+  encryptedState String   // Encrypted sender key chain state
+  lastUsedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, senderId])
+  @@index([senderId])
+  @@map("sender_keys")
+}
+
+// Sender key distribution messages (sent to each member)
+model SenderKeyDistribution {
+  id                  String   @id @default(uuid())
+  groupId             String
+  senderId            String
+  recipientId         String
+  distributionMessage String   // Encrypted sender key for recipient
+  createdAt           DateTime @default(now())
+
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender    User  @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User  @relation("recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, senderId, recipientId])
+  @@index([recipientId])
+  @@map("sender_key_distributions")
+}
+
+// Group messages
+model GroupMessage {
+  id            String   @id @default(uuid())
+  groupId       String
+  senderId      String
+  ciphertext    String   // Encrypted with sender key
+  ciphertextHash String?  // For replay protection
+  messageNumber Int      // Message counter for the sender
+  createdAt     DateTime @default(now())
+
+  group  Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender User  @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, ciphertextHash])
+  @@index([groupId, createdAt])
+  @@index([senderId])
+  @@map("group_messages")
+}
+
+// Calls (audio/video)
+model Call {
+  id              String        @id @default(uuid())
+  callerId        String
+  calleeId        String?       // Null for group calls
+  groupId         String?       // For group calls
+  callType        String        // AUDIO or VIDEO
+  status          String        // RINGING, ACTIVE, ENDED
+  encryptedSdp    String?       // Encrypted SDP offer/answer
+  encryptionKey   String?       // Encrypted stream encryption key
+  startedAt       DateTime      @default(now())
+  endedAt         DateTime?
+
+  caller User   @relation("caller", fields: [callerId], references: [id], onDelete: Cascade)
+  callee User?  @relation("callee", fields: [calleeId], references: [id], onDelete: Cascade)
+  group  Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  iceExchange CallIceCandidate[]
+
+  @@index([callerId])
+  @@index([calleeId])
+  @@index([groupId])
+  @@index([status, startedAt])
+  @@map("calls")
+}
+
+// ICE candidates for WebRTC
+model CallIceCandidate {
+  id        String   @id @default(uuid())
+  callId    String
+  userId    String
+  candidate String   // Encrypted ICE candidate JSON
+  createdAt DateTime @default(now())
+
+  call Call @relation(fields: [callId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([callId, createdAt])
+  @@map("call_ice_candidates")
+}
+

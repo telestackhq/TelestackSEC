@@ -1,0 +1,54 @@
+{
+  "name": "@telestack/telestacksec",
+  "version": "0.1.0",
+  "description": "TelestackSEC end-to-end encryption SDK for secure messaging",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "signal-protocol",
+    "encryption",
+    "messaging",
+    "cryptography",
+    "end-to-end-encryption"
+  ],
+  "author": "Telestack",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/telestackhq/TelestackSEC.git"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.8.0",
+    "@types/express": "^5.0.6",
+    "@types/socket.io": "^3.0.1",
+    "dotenv": "^16.3.1",
+    "events": "^3.3.0",
+    "express": "^5.2.1",
+    "libsignal": "^2.0.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.10.6",
+    "@types/uuid": "^9.0.7",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "prisma": "^5.8.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
+  }
+}
